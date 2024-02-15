@@ -1,0 +1,16 @@
+idf_component_register(SRCS 
+"fc_comm.c"
+"quaternion.c"
+"gpio.c"
+"pmw3901.c"
+"hmc5883l.c"
+"uart.c"
+"bmp390.c"
+"i2c.c"
+"nv_storage.c" 
+"state_estimator.c" 
+"filters.c" 
+"noise_analize.c" 
+"lsm6dsl.c" 
+"main.c"
+INCLUDE_DIRS ".")
