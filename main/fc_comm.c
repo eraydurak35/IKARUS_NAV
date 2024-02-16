@@ -49,7 +49,6 @@ void parse_fc_data(uart_data_t *uart_buff)
     for (uint8_t i = 0; i < uart_buff->lenght; i++)
     {
         
-
         if (isHeader1Found == 1)
         {
             read_buffer[byte_counter++] = uart_buff->data[i];
@@ -100,7 +99,6 @@ void parse_fc_data(uart_data_t *uart_buff)
                     if (validate_checksum(read_buffer, data3_size) == 1)
                     {
                         memcpy(range_ptr, read_buffer, data3_size);
-                        //printf("%d\n", range_ptr->range_cm);
                     }
                 }
             }
@@ -124,16 +122,14 @@ void parse_fc_data(uart_data_t *uart_buff)
 
 void send_data1()
 {
-    // 12 + 2 header + 1 checksum + 1 footer = 16 bytes
-
-    ///////         INT16 WILL OVERFLOW !!!!!!!!!!!!
+    // 24 + 2 header + 1 checksum + 1 footer = 28 bytes
     static uint8_t byteArray[sizeof(data_1_t) + 4];
-    data1.pitch = constrain(state_ptr->pitch_deg * 360.0f, INT16_MIN, INT16_MAX);
-    data1.roll = constrain(state_ptr->roll_deg * 360.0f, INT16_MIN, INT16_MAX);
-    data1.heading = constrain(state_ptr->heading_deg * 180.0f, 0, UINT16_MAX);
-    data1.pitch_dps = constrain(state_ptr->pitch_dps * 100.0f, INT16_MIN, INT16_MAX);
-    data1.roll_dps = constrain(state_ptr->roll_dps * 100.0f, INT16_MIN, INT16_MAX);
-    data1.yaw_dps = constrain(state_ptr->yaw_dps * 100.0f, INT16_MIN, INT16_MAX);
+    data1.pitch = state_ptr->pitch_deg;
+    data1.roll = state_ptr->roll_deg;
+    data1.heading = state_ptr->heading_deg;
+    data1.pitch_dps = state_ptr->pitch_dps;
+    data1.roll_dps = state_ptr->roll_dps;
+    data1.yaw_dps = state_ptr->yaw_dps;
 
     memcpy(byteArray + 2, &data1, sizeof(data_1_t));
     create_packet(byteArray, sizeof(data_1_t), data1_header1, data1_header2, data1_footer);
@@ -152,8 +148,6 @@ void send_data2()
     data2.velocity_z_ms = state_ptr->vel_up_ms * 1000.0f;
     data2.flow_x_velocity_ms = flow_ptr->velocity_x_ms * 1000.0f;
     data2.flow_y_velocity_ms = flow_ptr->velocity_y_ms * 1000.0f;
-
-    //printf("x: %.2f     y: %.2f\n", flow_ptr->velocity_x_ms, flow_ptr->velocity_y_ms);
     data2.flow_quality = flow_ptr->quality;
 
     memcpy(byteArray + 2, &data2, sizeof(data_2_t));
@@ -165,16 +159,16 @@ void send_data3()
     // 20 + 2 header + 1 checksum + 1 footer = 24 bytes
     static uint8_t byteArray[sizeof(data_3_t) + 4];
     data3.imu_temperature = imu_ptr->temp_mC;
-    data3.acc_x_ned_ms2 = state_ptr->acc_forward_ms2 * 10.0;
-    data3.acc_y_ned_ms2 = state_ptr->acc_right_ms2 * 10.0;
-    data3.acc_z_ned_ms2 = state_ptr->acc_up_ms2 * 10.0;
-    data3.acc_x_ms2 = imu_ptr->accel_ms2[X] * 100.0;
-    data3.acc_y_ms2 = imu_ptr->accel_ms2[Y] * 100.0;
-    data3.acc_z_ms2 = imu_ptr->accel_ms2[Z] * 100.0;
+    data3.acc_x_ned_ms2 = state_ptr->acc_forward_ms2 * 10.0f;
+    data3.acc_y_ned_ms2 = state_ptr->acc_right_ms2 * 10.0f;
+    data3.acc_z_ned_ms2 = state_ptr->acc_up_ms2 * 10.0f;
+    data3.acc_x_ms2 = imu_ptr->accel_ms2[X] * 100.0f;
+    data3.acc_y_ms2 = imu_ptr->accel_ms2[Y] * 100.0f;
+    data3.acc_z_ms2 = imu_ptr->accel_ms2[Z] * 100.0f;
 
-    data3.mag_x_gauss = mag_ptr->axis[X] * 10.0;
-    data3.mag_y_gauss = mag_ptr->axis[Y] * 10.0;
-    data3.mag_z_gauss = mag_ptr->axis[Z] * 10.0;
+    data3.mag_x_gauss = mag_ptr->axis[X] * 10.0f;
+    data3.mag_y_gauss = mag_ptr->axis[Y] * 10.0f;
+    data3.mag_z_gauss = mag_ptr->axis[Z] * 10.0f;
 
     memcpy(byteArray + 2, &data3, sizeof(data_3_t));
     create_packet(byteArray, sizeof(data_3_t), data3_header1, data3_header2, data3_footer);
@@ -217,6 +211,8 @@ void check_flight_status()
     baro_ptr->init_temp = baro_ptr->temp;
     state_ptr->altitude_m = 0;
     state_ptr->vel_up_ms = 0;
+    state_ptr->vel_forward_ms = 0;
+    state_ptr->vel_right_ms = 0;
   }
   prev_flight = *flight_ptr;
 }

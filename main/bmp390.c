@@ -124,11 +124,9 @@ void baro_get_ground_pressure(bmp390_t *baro)
     bmp390_read_i2c(baro);
     press_accumulator += baro->press;
     vTaskDelay(20 / portTICK_PERIOD_MS);
-    //printf("%f\n", baro->press);
   }
   baro->gnd_press = press_accumulator / 20.0f;
   baro->init_temp = baro->temp;
-  //printf("gnd_pres: %f   temp: %f\n", baro->gnd_press, baro->temp);
 }
 
 void get_bato_altitude(bmp390_t *baro)

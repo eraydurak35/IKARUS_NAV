@@ -49,7 +49,6 @@ static uint8_t counter4 = 0;
 
 void IRAM_ATTR timer1_callback(void *arg)
 {
-    // xTaskResumeFromISR(task1_handler); // Task 1 runs 1000Hz
     xTaskNotifyFromISR(task1_handler, 1, eIncrement, false);
 }
 
@@ -73,13 +72,13 @@ void task_1(void *pvParameters)
         apply_notch_filter_to_imu(&imu, notch);
         vTaskDelay(3 / portTICK_PERIOD_MS);
     }
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
     estimator_init(&config, &state, &imu, &mag, &baro, &flow, &range_finder);
 
     while (1) // 1000 Hz
     {
         if (xTaskNotifyWait(0, ULONG_MAX, &receivedValue, 1 / portTICK_PERIOD_MS) == pdTRUE)
         {
-            // vTaskSuspend(NULL);
             lsmldsl_read(&imu);
             apply_fir_filter_to_imu(&imu, fir);
             apply_notch_filter_to_imu(&imu, notch);
@@ -147,6 +146,7 @@ void task_3(void *pvParameters)
     i2c_master_init(I2C_NUM_1, GPIO_NUM_33, GPIO_NUM_32, 400000, GPIO_PULLUP_DISABLE);
     hmc5883l_setup();
     bmp390_setup_i2c();
+    vTaskDelay(500 / portTICK_PERIOD_MS);
     baro_get_ground_pressure(&baro);
 
     while (1)
@@ -187,10 +187,11 @@ void app_main(void)
 
     esp_timer_handle_t timer1;
     const esp_timer_create_args_t timer1_args =
-        {
-            .callback = &timer1_callback,
-            .arg = NULL,
-            .name = "timer1"};
+    {
+        .callback = &timer1_callback,
+        .arg = NULL,
+        .name = "timer1"
+    };
     esp_timer_create(&timer1_args, &timer1);
     esp_timer_start_periodic(timer1, 1000);
 }
