@@ -81,7 +81,6 @@ void parse_fc_data(uart_data_t *uart_buff)
                     {
                         memcpy(flight_ptr, read_buffer, data2_size);
                         check_flight_status();
-                        
                     }
                 }
             }

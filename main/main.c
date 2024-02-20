@@ -1,3 +1,13 @@
+/*
+ *    8888888 888    d8P         d8888 8888888b.  888     888  .d8888b.                                  
+ *      888   888   d8P         d88888 888   Y88b 888     888 d88P  Y88b                                 
+ *      888   888  d8P         d88P888 888    888 888     888 Y88b.                                      
+ *      888   888d88K         d88P 888 888   d88P 888     888  "Y888b.        88888b.   8888b.  888  888 
+ *      888   8888888b       d88P  888 8888888P"  888     888     "Y88b.      888 "88b     "88b 888  888 
+ *      888   888  Y88b     d88P   888 888 T88b   888     888       "888      888  888 .d888888 Y88  88P 
+ *      888   888   Y88b   d8888888888 888  T88b  Y88b. .d88P Y88b  d88P      888  888 888  888  Y8bd8P  
+ *    8888888 888    Y88b d88P     888 888   T88b  "Y88888P"   "Y8888P"       888  888 "Y888888   Y88P   
+ */
 // ||############################||
 // ||      ESP IDF LIBRARIES     ||
 // ||############################||
@@ -12,18 +22,18 @@
 // ||############################||
 // ||      CUSTOM LIBRARIES      ||
 // ||############################||
-#include "i2c.h"
-#include "filters.h"
+#include "lsm6dsl.h"
 #include "bmp390.h"
-#include "uart.h"
 #include "hmc5883l.h"
 #include "pmw3901.h"
+#include "i2c.h"
+#include "uart.h"
+#include "fc_comm.h"
+#include "filters.h"
 #include "gpio.h"
 #include "state_estimator.h"
 #include "nv_storage.h"
 #include "noise_analize.h"
-#include "fc_comm.h"
-#include "lsm6dsl.h"
 #include "typedefs.h"
 
 static TaskHandle_t task1_handler;
@@ -75,7 +85,7 @@ void task_1(void *pvParameters)
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     estimator_init(&config, &state, &imu, &mag, &baro, &flow, &range_finder);
 
-    while (1) // 1000 Hz
+    while (1)                                           // 1000 Hz
     {
         if (xTaskNotifyWait(0, ULONG_MAX, &receivedValue, 1 / portTICK_PERIOD_MS) == pdTRUE)
         {
@@ -88,7 +98,7 @@ void task_1(void *pvParameters)
             //printf("1\n");
 
             counter1++;
-            if (counter1 >= 2) // 500 Hz
+            if (counter1 >= 2)                          // 500 Hz
             {
                 counter1 = 0;
                 sample_imu_to_analize(&imu, fft);
@@ -97,28 +107,28 @@ void task_1(void *pvParameters)
                 predict_velocityXY();
                 calculate_altitude_velocity();
             }
-            else // 500 Hz
+            else                                        // 500 Hz
             {
                 counter2++;
-                if (counter2 >= 5) // 100 Hz
+                if (counter2 >= 5)                      // 100 Hz
                 {
                     counter2 = 0;
                     get_flow_velocity();
                     correct_velocityXY();
                 }
-                else // 400 Hz
+                else                                    // 400 Hz
                 {
                     counter3++;
-                    if (counter3 >= 8) // 50 Hz
+                    if (counter3 >= 8)                  // 50 Hz
                     {
                         counter3 = 0;
                         send_data2();
                         send_data3();
                     }
-                    else // 350 Hz
+                    else                                // 350 Hz
                     {
                         counter4++;
-                        if (counter4 >= 14) // 25 Hz
+                        if (counter4 >= 14)             // 25 Hz
                         {
                             counter4 = 0;
                             reconfig_all_notch_filters(notch, fft);
