@@ -40,6 +40,7 @@ static TaskHandle_t task1_handler;
 static TaskHandle_t task2_handler;
 static TaskHandle_t task3_handler;
 static TaskHandle_t task4_handler;
+static TaskHandle_t task5_handler;
 static lsm6dsl_t imu;
 static fir_filter_t fir[6];
 static notch_filter_t notch[18];
@@ -54,7 +55,6 @@ static range_finder_t range_finder = {-1};
 static uint8_t counter1 = 0;
 static uint8_t counter2 = 0;
 static uint8_t counter3 = 0;
-static uint8_t counter4 = 0;
 
 
 void IRAM_ATTR timer1_callback(void *arg)
@@ -93,9 +93,6 @@ void task_1(void *pvParameters)
             apply_fir_filter_to_imu(&imu, fir);
             apply_notch_filter_to_imu(&imu, notch);
             ahrs_predict();
-            send_data1();
-
-            //printf("1\n");
 
             counter1++;
             if (counter1 >= 2)                          // 500 Hz
@@ -119,22 +116,10 @@ void task_1(void *pvParameters)
                 else                                    // 400 Hz
                 {
                     counter3++;
-                    if (counter3 >= 8)                  // 50 Hz
+                    if (counter3 >= 16)                  // 25 Hz
                     {
                         counter3 = 0;
-                        send_data2();
-                        send_data3();
-                    }
-                    else                                // 350 Hz
-                    {
-                        counter4++;
-                        if (counter4 >= 14)             // 25 Hz
-                        {
-                            counter4 = 0;
-                            reconfig_all_notch_filters(notch, fft);
-                            check_flight_status();
-                            
-                        }
+                        reconfig_all_notch_filters(notch, fft);
                     }
                 }
             }
@@ -170,21 +155,26 @@ void task_3(void *pvParameters)
 
 void task_4(void *pvParameters)
 {
-    uart_begin(UART_NUM_1, 5000000, 18, 19, UART_PARITY_EVEN);
     uart_begin(UART_NUM_2, 19200, 17, 16, UART_PARITY_DISABLE);
-    static uart_data_t uart1_buff;
     static uart_data_t uart2_buff;
-    fc_comm_init(&state, &flight, &range_finder, &config, &imu, &mag, &flow, &baro);
 
     while (1)
     {
         uart_read(UART_NUM_2, &uart2_buff, 5);
-        uart_read(UART_NUM_1, &uart1_buff, 5);
         parse_pmw3901_data(&flow, &uart2_buff);
-        parse_fc_data(&uart1_buff);
     }
 }
 
+
+void task_5(void *pvParameters)
+{
+    flight_comm_init(&state, &baro, &flow, &imu, &mag, &flight, &config, &range_finder);
+
+    while(1)
+    {
+        slave_send_recv_flight_comm();
+    }
+}
 void app_main(void)
 {
     nvs_flash_init();
@@ -194,6 +184,7 @@ void app_main(void)
     xTaskCreatePinnedToCore(&task_4, "task4", 1024 * 8, NULL, 1, &task4_handler, tskNO_AFFINITY);
     xTaskCreatePinnedToCore(&task_1, "task1", 1024 * 4, NULL, 1, &task1_handler, tskNO_AFFINITY);
     xTaskCreatePinnedToCore(&task_2, "task2", 1024 * 8, NULL, 1, &task2_handler, tskNO_AFFINITY);
+    xTaskCreatePinnedToCore(&task_5, "task5", 1024 * 4, NULL, 1, &task5_handler, tskNO_AFFINITY);
 
     esp_timer_handle_t timer1;
     const esp_timer_create_args_t timer1_args =
