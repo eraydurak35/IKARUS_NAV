@@ -10,6 +10,37 @@
 
 #define BUFF_SIZE 130
 
+
+typedef struct 
+{
+    float sample_rate;
+    float a0;
+    float a1;
+    float a2;
+    float b0;
+    float b1;
+    float b2;
+    float x1;
+    float x2;
+    float y1;
+    float y2;
+} lowpass_filter_t;
+
+typedef struct
+{
+    float sample_rate;
+    float a0;
+    float a1;
+    float a2;
+    float b0;
+    float b1;
+    float b2;
+    float x1;
+    float x2;
+    float y1;
+    float y2;
+} notch_filter_t;
+
 typedef struct
 {
     float pitch;
@@ -176,20 +207,7 @@ typedef struct
     uint8_t index;
 } fir_filter_t;
 
-typedef struct
-{
-    float sample_rate;
-    float a0;
-    float a1;
-    float a2;
-    float b0;
-    float b1;
-    float b2;
-    float x1;
-    float x2;
-    float y1;
-    float y2;
-} notch_filter_t;
+
 
 
 

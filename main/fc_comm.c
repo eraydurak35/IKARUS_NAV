@@ -66,7 +66,7 @@ void flight_comm_init(states_t *sts, bmp390_t *bmp, pmw3901_t *pmw, lsm6dsl_t *l
     memset(spi_heap_mem_send, 0, spi_trans_byte_size);
 }
 
-void slave_send_recv_flight_comm()
+void slave_send_recv_flight_comm(float x, float y, float z, float a, float b, float c)
 {
     // prepare send packet
 
@@ -89,16 +89,30 @@ void slave_send_recv_flight_comm()
     nav_data.flow_quality = flow_ptr->quality;
 
     nav_data.imu_temperature = imu_ptr->temp_mC;
+
+/* 
     nav_data.acc_x_ned_ms2 = state_ptr->acc_forward_ms2 * 10.0f;
     nav_data.acc_y_ned_ms2 = state_ptr->acc_right_ms2 * 10.0f;
-    nav_data.acc_z_ned_ms2 = state_ptr->acc_up_ms2 * 10.0f;
-    nav_data.acc_x_ms2 = imu_ptr->accel_ms2[X] * 100.0f;
-    nav_data.acc_y_ms2 = imu_ptr->accel_ms2[Y] * 100.0f;
-    nav_data.acc_z_ms2 = imu_ptr->accel_ms2[Z] * 100.0f;
+    nav_data.acc_z_ned_ms2 = state_ptr->acc_up_ms2 * 10.0f; */
+
+
+    nav_data.acc_x_ned_ms2 = a * 10.0f;
+    nav_data.acc_y_ned_ms2 = b * 10.0f;
+    nav_data.acc_z_ned_ms2 = c * 10.0f;
+
+    nav_data.acc_x_ms2 = imu_ptr->accel_ms2[X] * 400.0f;
+    nav_data.acc_y_ms2 = imu_ptr->accel_ms2[Y] * 400.0f;
+    nav_data.acc_z_ms2 = imu_ptr->accel_ms2[Z] * 400.0f;
 
     nav_data.mag_x_gauss = mag_ptr->axis[X] * 10.0f;
     nav_data.mag_y_gauss = mag_ptr->axis[Y] * 10.0f;
     nav_data.mag_z_gauss = mag_ptr->axis[Z] * 10.0f;
+ 
+
+
+/*     nav_data.mag_x_gauss = x * 100.0f;
+    nav_data.mag_y_gauss = y * 100.0f;
+    nav_data.mag_z_gauss = z * 100.0f; */
 
 
     memcpy(spi_heap_mem_send + 1, &nav_data, sizeof(nav_data_t));
@@ -120,6 +134,14 @@ void slave_send_recv_flight_comm()
     {
         memcpy(&flight_data, spi_heap_mem_receive + 1, sizeof(flight_data_t));
         
+        if (flight_ptr->arm_status == 0 && flight_data.arm_status == 1)
+        {
+            baro_ptr->gnd_press = baro_ptr->press;
+            baro_ptr->init_temp = baro_ptr->temp;
+            state_ptr->vel_forward_ms = 0;
+            state_ptr->vel_right_ms = 0;
+            state_ptr->vel_up_ms = 0;
+        }
         flight_ptr->arm_status = flight_data.arm_status;
         range_ptr->range_cm = flight_data.range_cm;
 

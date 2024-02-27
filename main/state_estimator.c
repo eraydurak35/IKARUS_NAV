@@ -129,6 +129,17 @@ void ahrs_correct()
     err.y = err_acc.y + err_mag.y;
     err.z = err_acc.z + err_mag.z;
 
+    if (err.x > 0.4f) err.x = 0.4f;
+    else if (err.x < -0.4f) err.x = -0.4f;
+
+    if (err.y > 0.4f) err.y = 0.4f;
+    else if (err.y < -0.4f) err.y = -0.4f;
+
+    if (err.z > 0.4f) err.z = 0.4f;
+    else if (err.z < -0.4f) err.z = -0.4f;
+
+    //printf("%.2f, %.2f\n", err.x, err.y);
+
     imu_ptr->gyro_bias_dps[Y] += err.x * config_ptr->ahrs_filter_zeta;
     imu_ptr->gyro_bias_dps[X] += err.y * config_ptr->ahrs_filter_zeta;
     imu_ptr->gyro_bias_dps[Z] -= err.z * config_ptr->ahrs_filter_zeta;
@@ -167,9 +178,6 @@ void get_earth_frame_accel()
     state_ptr->acc_forward_ms2 = imu_ptr->accel_ms2[Y] * rot_matrix[0][0] + imu_ptr->accel_ms2[X] * rot_matrix[1][0] + imu_ptr->accel_ms2[Z] * rot_matrix[2][0];
     state_ptr->acc_right_ms2 = imu_ptr->accel_ms2[Y] * rot_matrix[0][1] + imu_ptr->accel_ms2[X] * rot_matrix[1][1] + imu_ptr->accel_ms2[Z] * rot_matrix[2][1];
     state_ptr->acc_up_ms2 = (imu_ptr->accel_ms2[Y] * rot_matrix[0][2] + imu_ptr->accel_ms2[X] * rot_matrix[1][2] + imu_ptr->accel_ms2[Z] * rot_matrix[2][2]) - 9.806f;
-    //state_ptr->acc_up_ms2 -= 9.806f;
-
-    // printf("%.1f,%.1f,%.1f\n", state_ptr->acc_forward_ms2, state_ptr->acc_right_ms2, state_ptr->acc_up_ms2);
 }
 
 void correct_velocityXY()
@@ -243,6 +251,7 @@ void calculate_altitude_velocity()
 
     else
         RangeAlt = range_finder->range_cm / 100.0f;
+        //RangeAlt = -1;
 
     if (RangeAlt >= 0 && RangeAlt < 3.0f) // 3
     {

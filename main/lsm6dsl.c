@@ -3,12 +3,16 @@
 #include "i2c.h"
 
 
-const float accel_bias_ms2[3] = {-0.023902f, -0.051104f, 0.238851f};
-const float accel_calib_matrix[3][3] = {
-  {0.994289f, 0.000270f, -0.002591f},
-  {0.000270f, 0.995928f, 0.001289f},
-  {-0.002591f, 0.001289f, 1.002714f}
+const float accel_bias_ms2[3] = {-0.0410183726183868f, -0.0476472728044818f, 0.249395466543557f};
+const float accel_calib_matrix[3][3] = 
+{
+    {0.994499660760511f, 0.000411617480116379f, -0.00333746338878276f},
+    {0.000411617480116379f,	0.995922546944084f,	0.00184908061381518f},
+    {-0.00333746338878276f,	0.00184908061381518f, 1.00341339931936f}
 };
+
+
+
 static void getCalibratedResults(lsm6dsl_t *imu);
 static void parse_buffer(uint8_t *buff, lsm6dsl_t *imu);
 

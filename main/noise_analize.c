@@ -261,7 +261,7 @@ void find_peaks(fft_t *fft)
 
     for (uint8_t i = 0; i < PEAK_COUNT; i++)
     {
-        fft->filt_bin[i] += (fft->peaks[i].bin - fft->filt_bin[i]) * 0.06f;
+        fft->filt_bin[i] += (fft->peaks[i].bin - fft->filt_bin[i]) * 0.05f;
     }
 
 }

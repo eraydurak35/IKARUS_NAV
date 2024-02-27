@@ -53,6 +53,6 @@
 void bmp390_setup_i2c();
 void bmp390_read_i2c(bmp390_t *bmp);
 void baro_get_ground_pressure(bmp390_t *baro);
-void get_bato_altitude(bmp390_t *baro);
+void get_baro_altitude(bmp390_t *baro);
 
 #endif

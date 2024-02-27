@@ -14,12 +14,21 @@ static const float fir_gain[7] =
   0.142856919905681196f,
   0.142386908288827163f
 };
+/* static const float fir_gain[5] = 
+{
+    0.199736703181241426f,
+    0.200131617212090052f,
+    0.200263359213336989f,
+    0.200131617212090052f,
+    0.199736703181241426f
+}; */
 
 
 void fir_filter_init(fir_filter_t *fir)
 {
     for (uint8_t i = 0; i < 6; i++)
     {
+        //fir[i].size = 5;
         fir[i].size = 7;
         fir[i].index = 0;
     }
@@ -154,4 +163,39 @@ void apply_notch_filter_to_imu(lsm6dsl_t *imu, notch_filter_t *notch)
         }
     }
 
+}
+
+
+void lowpass_configure(float cf, lowpass_filter_t *lowpass)
+{
+    float omega = 2.0f * M_PI * cf / 1000.0f;
+    float sn = sinf(omega);
+    float cs = cosf(omega);
+    float alpha = sn / 2.0f;
+
+    lowpass->b0 = (1.0f - cs) / 2.0f;
+    lowpass->b1 = 1.0f - cs;
+    lowpass->b2 = (1.0f - cs) / 2.0f;
+    lowpass->a0 = 1.0f + alpha;
+    lowpass->a1 = -2.0f * cs;
+    lowpass->a2 = 1.0f - alpha;
+
+    lowpass->b0 /= lowpass->a0;
+    lowpass->b1 /= lowpass->a0;
+    lowpass->b2 /= lowpass->a0;
+    lowpass->a1 /= lowpass->a0;
+    lowpass->a2 /= lowpass->a0;
+}
+
+void lowpass_filter(lowpass_filter_t *lowpass, float *value)
+{
+    static float x = 0;
+    static float y = 0;
+    x = *value;
+    y = lowpass->b0 * x + lowpass->b1 * lowpass->x1 + lowpass->b2 * lowpass->x2 - lowpass->a1 * lowpass->y1 - lowpass->a2 * lowpass->y2;
+    lowpass->x2 = lowpass->x1;
+    lowpass->x1 = x;
+    lowpass->y2 = lowpass->y1;
+    lowpass->y1 = y;
+    *value = y;
 }

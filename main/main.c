@@ -41,7 +41,7 @@ static TaskHandle_t task2_handler;
 static TaskHandle_t task3_handler;
 static TaskHandle_t task4_handler;
 static TaskHandle_t task5_handler;
-static lsm6dsl_t imu;
+static lsm6dsl_t imu, unfilt_imu;
 static fir_filter_t fir[6];
 static notch_filter_t notch[18];
 static fft_t fft[6];
@@ -56,6 +56,10 @@ static uint8_t counter1 = 0;
 static uint8_t counter2 = 0;
 static uint8_t counter3 = 0;
 
+//static lowpass_filter_t lowpass;
+
+static float fft_a, fft_b, fft_c;
+static float gyr_raw_x, gyr_raw_y, gyr_raw_z;
 
 void IRAM_ATTR timer1_callback(void *arg)
 {
@@ -85,12 +89,26 @@ void task_1(void *pvParameters)
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     estimator_init(&config, &state, &imu, &mag, &baro, &flow, &range_finder);
 
+    //lowpass_configure(300.0f, &lowpass);
+
     while (1)                                           // 1000 Hz
     {
         if (xTaskNotifyWait(0, ULONG_MAX, &receivedValue, 1 / portTICK_PERIOD_MS) == pdTRUE)
         {
             lsmldsl_read(&imu);
+
+/*          gyr_raw_x = imu.gyro_dps[X];
+            gyr_raw_y = imu.gyro_dps[Y];
+            gyr_raw_z = imu.gyro_dps[Z]; */
+
+            fft_a = fft[1].filt_bin[0] * FFT_RES;
+            fft_b = fft[1].filt_bin[1] * FFT_RES;
+            fft_c = fft[1].filt_bin[2] * FFT_RES;
+
             apply_fir_filter_to_imu(&imu, fir);
+
+            unfilt_imu = imu;
+
             apply_notch_filter_to_imu(&imu, notch);
             ahrs_predict();
 
@@ -98,7 +116,7 @@ void task_1(void *pvParameters)
             if (counter1 >= 2)                          // 500 Hz
             {
                 counter1 = 0;
-                sample_imu_to_analize(&imu, fft);
+                sample_imu_to_analize(&unfilt_imu, fft);
                 ahrs_correct();
                 get_earth_frame_accel();
                 predict_velocityXY();
@@ -148,7 +166,7 @@ void task_3(void *pvParameters)
     {
         hmc5883l_read(&mag);
         bmp390_read_i2c(&baro);
-        get_bato_altitude(&baro);
+        get_baro_altitude(&baro);
         vTaskDelay(20 / portTICK_PERIOD_MS);
     }
 }
@@ -170,9 +188,9 @@ void task_5(void *pvParameters)
 {
     flight_comm_init(&state, &baro, &flow, &imu, &mag, &flight, &config, &range_finder);
 
-    while(1)
+    while (1)
     {
-        slave_send_recv_flight_comm();
+        slave_send_recv_flight_comm(gyr_raw_x, gyr_raw_y, gyr_raw_z, fft_a, fft_b, fft_c);
     }
 }
 void app_main(void)

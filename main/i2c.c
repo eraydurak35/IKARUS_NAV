@@ -29,7 +29,7 @@ void i2c_read_data(i2c_port_t port_num, uint8_t slave_addr, uint8_t register_rea
     if (size > 1) i2c_master_read(cmd, buffer, size - 1, I2C_MASTER_ACK);
     i2c_master_read_byte(cmd, buffer + size - 1, I2C_MASTER_NACK);
     i2c_master_stop(cmd);
-    i2c_master_cmd_begin(port_num, cmd, 1000 / portTICK_PERIOD_MS);
+    i2c_master_cmd_begin(port_num, cmd, 10 / portTICK_PERIOD_MS); // 1000
     i2c_cmd_link_delete(cmd);
 }
 
@@ -43,6 +43,6 @@ void i2c_write_data(i2c_port_t port_num, uint8_t slave_addr, uint8_t reg, uint8_
     i2c_master_write_byte(cmd, reg, ACK_CHECK_EN);
     i2c_master_write_byte(cmd, value, ACK_CHECK_EN);
     i2c_master_stop(cmd);
-    i2c_master_cmd_begin(port_num, cmd, 1000 / portTICK_PERIOD_MS);
+    i2c_master_cmd_begin(port_num, cmd, 10 / portTICK_PERIOD_MS);
     i2c_cmd_link_delete(cmd);
 }

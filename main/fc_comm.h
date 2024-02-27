@@ -16,7 +16,7 @@
 
 
 void flight_comm_init(states_t *sts, bmp390_t *bmp, pmw3901_t *pmw, lsm6dsl_t *lsm, hmc5883l_t *hmc, flight_t *flt, nav_config_t *cfg, range_finder_t *rng);
-void slave_send_recv_flight_comm();
+void slave_send_recv_flight_comm(float x, float y, float z, float a, float b, float c);
 
 
 

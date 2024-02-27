@@ -129,7 +129,7 @@ void baro_get_ground_pressure(bmp390_t *baro)
   baro->init_temp = baro->temp;
 }
 
-void get_bato_altitude(bmp390_t *baro)
+void get_baro_altitude(bmp390_t *baro)
 {
   float alt_baro = 44330.0f * (1.0f - powf(baro->press / baro->gnd_press, 0.19029f));
   baro->altitude_m = alt_baro - (baro->temp - baro->init_temp) * 0.0453f;

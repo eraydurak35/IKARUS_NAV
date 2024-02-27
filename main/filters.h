@@ -14,4 +14,8 @@ void notch_configure(float cf, float bw, notch_filter_t *notch);
 void notch_filter(notch_filter_t *notch, float *value);
 void apply_notch_filter_to_imu(lsm6dsl_t *imu, notch_filter_t *notch);
 void reconfig_all_notch_filters(notch_filter_t *notch, fft_t *fft);
+
+
+void lowpass_configure(float cf, lowpass_filter_t *lowpass);
+void lowpass_filter(lowpass_filter_t *lowpass, float *value);
 #endif
