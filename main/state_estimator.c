@@ -39,6 +39,8 @@ void estimator_init(nav_config_t *cfg, states_t *sta, lsm6dsl_t *lsm, hmc5883l_t
     flow_ptr = flw;
     range_finder = rng;
 
+    /*
+    quat_t q_acc, q_mag;
     acc_vec.x = imu_ptr->accel_ms2[Y];
     acc_vec.y = imu_ptr->accel_ms2[X];
     acc_vec.z = imu_ptr->accel_ms2[Z];
@@ -50,10 +52,20 @@ void estimator_init(nav_config_t *cfg, states_t *sta, lsm6dsl_t *lsm, hmc5883l_t
     norm_vector(&acc_vec);
     norm_vector(&mag_vec);
 
-    quat_t q_acc, q_mag;
     get_attitude_from_accel(&acc_vec, &q_acc);
     get_heading_from_mag(&mag_vec, &q_mag);
     q = get_quat_product(&q_acc, &q_mag);
+    */
+
+    acc_vec.x = imu_ptr->accel_ms2[X];
+    acc_vec.y = imu_ptr->accel_ms2[Y];
+    acc_vec.z = imu_ptr->accel_ms2[Z];
+
+    mag_vec.x = mag_ptr->axis[X];
+    mag_vec.y = mag_ptr->axis[Y];
+    mag_vec.z = mag_ptr->axis[Z];
+
+    get_quat_from_vector_measurements(&acc_vec, &mag_vec, &q);
 }
 
 void ahrs_predict()
@@ -138,8 +150,6 @@ void ahrs_correct()
     if (err.z > 0.4f) err.z = 0.4f;
     else if (err.z < -0.4f) err.z = -0.4f;
 
-    //printf("%.2f, %.2f\n", err.x, err.y);
-
     imu_ptr->gyro_bias_dps[Y] += err.x * config_ptr->ahrs_filter_zeta;
     imu_ptr->gyro_bias_dps[X] += err.y * config_ptr->ahrs_filter_zeta;
     imu_ptr->gyro_bias_dps[Z] -= err.z * config_ptr->ahrs_filter_zeta;
@@ -223,8 +233,17 @@ void get_flow_velocity()
     flow_ptr->filt_x_cpi += ((flow_ptr->raw_x_cpi + filt_gyr_degs_roll) - flow_ptr->filt_x_cpi) * 0.2f;
     flow_ptr->filt_y_cpi += ((flow_ptr->raw_y_cpi + filt_gyr_degs_pitch) - flow_ptr->filt_y_cpi) * 0.2f;
 
-    flow_ptr->velocity_y_ms = flow_ptr->filt_x_cpi * (state_ptr->altitude_m / 5.0f);
-    flow_ptr->velocity_x_ms = flow_ptr->filt_y_cpi * (state_ptr->altitude_m / -5.0f);
+    if (range_finder->range_cm > 400 && state_ptr->altitude_m < 4.0f)
+    {
+        flow_ptr->velocity_y_ms = flow_ptr->filt_x_cpi * (4.0f / 5.0f);
+        flow_ptr->velocity_x_ms = flow_ptr->filt_y_cpi * (4.0f / -5.0f);
+    }
+    else
+    {
+        flow_ptr->velocity_y_ms = flow_ptr->filt_x_cpi * (state_ptr->altitude_m / 5.0f);
+        flow_ptr->velocity_x_ms = flow_ptr->filt_y_cpi * (state_ptr->altitude_m / -5.0f);
+    }
+    
 
     // 4cm away from center of rotation correction via angular speed to linear speed calculation
     // y axis is not needed

@@ -57,3 +57,12 @@ void read_config(nav_config_t *cfg)
         nvs_close(nvm_handle);
     }
 }
+
+void print_config(nav_config_t cfg)
+{
+    float *p = (float *)&cfg;
+    for (int i = 0; i < 11; i++) 
+    {
+        printf("s.%c = %f\n", 'a' + i, p[i]);
+    }
+}

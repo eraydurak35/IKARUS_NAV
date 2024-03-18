@@ -29,7 +29,6 @@ void parse_pmw3901_data(pmw3901_t *pmw, uart_data_t *buff)
           pmw->raw_y_cpi = data_frame_buff[4] << 8 | data_frame_buff[3];
           // Simple low pass filter
           pmw->quality += ((data_frame_buff[6] / 2.0f) - pmw->quality) * 0.1f;
-          // flow_tilt_compansation();
         }
       }
     }

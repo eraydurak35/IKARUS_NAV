@@ -29,7 +29,7 @@ void get_quat_deriv(quat_t *q_ptr, vector_t *vect, quat_t *q_dot_ptr)
 void norm_vector(vector_t *vector_ptr)
 {
     static float norm;
-    norm = sqrt(vector_ptr->x * vector_ptr->x + vector_ptr->y * vector_ptr->y + vector_ptr->z * vector_ptr->z);
+    norm = sqrtf(vector_ptr->x * vector_ptr->x + vector_ptr->y * vector_ptr->y + vector_ptr->z * vector_ptr->z);
     if (norm == 0) norm = 0.01f;
     vector_ptr->x /= norm;
     vector_ptr->y /= norm;
@@ -40,7 +40,7 @@ void norm_vector(vector_t *vector_ptr)
 void norm_quat(quat_t *quat_ptr)
 {
     static float norm;
-    norm = sqrt(quat_ptr->w * quat_ptr->w + quat_ptr->x * quat_ptr->x + quat_ptr->y * quat_ptr->y + quat_ptr->z * quat_ptr->z);
+    norm = sqrtf(quat_ptr->w * quat_ptr->w + quat_ptr->x * quat_ptr->x + quat_ptr->y * quat_ptr->y + quat_ptr->z * quat_ptr->z);
     if (norm == 0) norm = 0.01f;
     quat_ptr->w /= norm;
     quat_ptr->x /= norm;
@@ -84,7 +84,7 @@ void quat_to_euler(quat_t *q_ptr, vector_t *euler)
 
 // get quaternion attitude from only accelerometer vector
 // Z axis should be negative
-// vector should be normalize
+// vector should be normalized
 void get_attitude_from_accel(vector_t *vec, quat_t *q_result)
 {
     if(vec->z >= 0.0f)
@@ -106,7 +106,7 @@ void get_attitude_from_accel(vector_t *vec, quat_t *q_result)
 }
 
 // get quaternion attitude from only magnetometer vector
-// vector should be normalize
+// vector should be normalized
 void get_heading_from_mag(vector_t *vec, quat_t *q_result)
 {
     float ro = vec->x * vec->x + vec->y * vec->y;
@@ -143,3 +143,29 @@ quat_t get_quat_product(quat_t *q1, quat_t *q2)
 
     return q_result;
 }
+
+
+void get_quat_from_vector_measurements(vector_t *vec_acc,vector_t *vec_mag, quat_t *q_result)
+{
+    float pitch_radian = (asin(vec_acc->y / sqrt(vec_acc->x * vec_acc->x + vec_acc->y * vec_acc->y + vec_acc->z * vec_acc->z)));
+    float roll_radian = -atan2(vec_acc->x , vec_acc->z);
+
+    float cos_pitch = cos(pitch_radian);
+    float cos_roll = cos(-roll_radian);
+    float sin_roll = sin(-roll_radian);
+    float sin_pitch = sin(pitch_radian);
+
+    float _X = -vec_mag->y * cos_pitch - vec_mag->x * sin_roll * sin_pitch + vec_mag->z * cos_roll * sin_pitch;
+    float _Y = -vec_mag->x * cos_roll - vec_mag->z * sin_roll;
+    float heading_radian = atan2(_Y, _X) + M_PI;
+
+    q_result->w = cos(roll_radian / 2.0f) * cos(pitch_radian / 2.0f) * cos(heading_radian / 2.0f) + sin(roll_radian / 2.0f) * sin(pitch_radian / 2.0f) * sin(heading_radian / 2.0f);
+    q_result->x = sin(roll_radian / 2.0f) * cos(pitch_radian / 2.0f) * cos(heading_radian / 2.0f) - cos(roll_radian / 2.0f) * sin(pitch_radian / 2.0f) * sin(heading_radian / 2.0f);
+    q_result->y = cos(roll_radian / 2.0f) * sin(pitch_radian / 2.0f) * cos(heading_radian / 2.0f) + sin(roll_radian / 2.0f) * cos(pitch_radian / 2.0f) * sin(heading_radian / 2.0f);
+    q_result->z = cos(roll_radian / 2.0f) * cos(pitch_radian / 2.0f) * sin(heading_radian / 2.0f) - sin(roll_radian / 2.0f) * sin(pitch_radian / 2.0f) * cos(heading_radian / 2.0f);
+
+    norm_quat(q_result);
+}
+
+
+

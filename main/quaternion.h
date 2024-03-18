@@ -15,5 +15,6 @@ void quat_to_euler(quat_t *q_ptr, vector_t *att);
 void get_attitude_from_accel(vector_t *vec, quat_t *q_result);
 void get_heading_from_mag(vector_t *vec, quat_t *q_result);
 quat_t get_quat_product(quat_t *q1, quat_t *q2);
+void get_quat_from_vector_measurements(vector_t *vec_acc,vector_t *vec_mag, quat_t *q_result);
 
 #endif /*QUATERNION_H*/

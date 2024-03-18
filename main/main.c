@@ -11,31 +11,33 @@
 // ||############################||
 // ||      ESP IDF LIBRARIES     ||
 // ||############################||
-#include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_system.h"
-#include "esp_timer.h"
-#include "driver/i2c.h"
 #include "driver/uart.h"
+#include "esp_system.h"
+#include "driver/i2c.h"
+#include "esp_timer.h"
 #include "nvs_flash.h"
+#include <stdio.h>
 // ||############################||
 // ||      CUSTOM LIBRARIES      ||
 // ||############################||
-#include "lsm6dsl.h"
-#include "bmp390.h"
-#include "hmc5883l.h"
-#include "pmw3901.h"
-#include "i2c.h"
-#include "uart.h"
-#include "fc_comm.h"
-#include "filters.h"
-#include "gpio.h"
 #include "state_estimator.h"
-#include "nv_storage.h"
 #include "noise_analize.h"
+#include "nv_storage.h"
 #include "typedefs.h"
-
+#include "hmc5883l.h"
+#include "lsm6dsl.h"
+#include "pmw3901.h"
+#include "filters.h"
+#include "fc_comm.h"
+#include "bmp390.h"
+#include "gpio.h"
+#include "uart.h"
+#include "i2c.h"
+// ||############################||
+// ||      GLOBAL WARIABLES      ||
+// ||############################||
 static TaskHandle_t task1_handler;
 static TaskHandle_t task2_handler;
 static TaskHandle_t task3_handler;
@@ -52,15 +54,7 @@ static bmp390_t baro;
 static pmw3901_t flow;
 static flight_t flight;
 static range_finder_t range_finder = {-1};
-static uint8_t counter1 = 0;
-static uint8_t counter2 = 0;
-static uint8_t counter3 = 0;
-
-//static lowpass_filter_t lowpass;
-
-static float fft_a, fft_b, fft_c;
-static float gyr_raw_x, gyr_raw_y, gyr_raw_z;
-
+                                                            ///  MAG DATA NOT CALIBRATED 
 void IRAM_ATTR timer1_callback(void *arg)
 {
     xTaskNotifyFromISR(task1_handler, 1, eIncrement, false);
@@ -68,7 +62,10 @@ void IRAM_ATTR timer1_callback(void *arg)
 
 void task_1(void *pvParameters)
 {
-    static uint32_t receivedValue = 0;
+    static uint32_t notification = 0;
+    static uint8_t counter1 = 0;
+    static uint8_t counter2 = 0;
+    static uint8_t counter3 = 0;
     imu.gyro_bias_dps[X] = 2.1f;
     imu.gyro_bias_dps[Y] = -3.05f;
     imu.gyro_bias_dps[Z] = -1.1f;
@@ -89,26 +86,13 @@ void task_1(void *pvParameters)
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     estimator_init(&config, &state, &imu, &mag, &baro, &flow, &range_finder);
 
-    //lowpass_configure(300.0f, &lowpass);
-
     while (1)                                           // 1000 Hz
     {
-        if (xTaskNotifyWait(0, ULONG_MAX, &receivedValue, 1 / portTICK_PERIOD_MS) == pdTRUE)
+        if (xTaskNotifyWait(0, ULONG_MAX, &notification, 1 / portTICK_PERIOD_MS) == pdTRUE)
         {
             lsmldsl_read(&imu);
-
-/*          gyr_raw_x = imu.gyro_dps[X];
-            gyr_raw_y = imu.gyro_dps[Y];
-            gyr_raw_z = imu.gyro_dps[Z]; */
-
-            fft_a = fft[1].filt_bin[0] * FFT_RES;
-            fft_b = fft[1].filt_bin[1] * FFT_RES;
-            fft_c = fft[1].filt_bin[2] * FFT_RES;
-
             apply_fir_filter_to_imu(&imu, fir);
-
             unfilt_imu = imu;
-
             apply_notch_filter_to_imu(&imu, notch);
             ahrs_predict();
 
@@ -190,7 +174,7 @@ void task_5(void *pvParameters)
 
     while (1)
     {
-        slave_send_recv_flight_comm(gyr_raw_x, gyr_raw_y, gyr_raw_z, fft_a, fft_b, fft_c);
+        slave_send_recv_flight_comm();
     }
 }
 void app_main(void)
