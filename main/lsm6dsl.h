@@ -45,7 +45,7 @@
 
 
 void lsmldsl_read(lsm6dsl_t *imu);
-void lsm6dsl_setup(uint8_t odr, uint8_t accel_range, uint8_t gyro_range);
+void lsm6dsl_setup(uint8_t odr, uint8_t accel_range, uint8_t gyro_range, float *acc_cal);
 
 
 #endif

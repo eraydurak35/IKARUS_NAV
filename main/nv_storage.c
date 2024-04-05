@@ -66,3 +66,118 @@ void print_config(nav_config_t cfg)
         printf("s.%c = %f\n", 'a' + i, p[i]);
     }
 }
+
+
+void save_mag_cal(float *mg_cal)
+{
+    nvs_handle_t nvm_handle;
+    esp_err_t ret = nvs_open("storage", NVS_READWRITE, &nvm_handle);
+    if (ret != ESP_OK) 
+    {
+        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+    } 
+    else 
+    {
+        ret = nvs_set_blob(nvm_handle, "mag_calib_data", mg_cal, 48);
+        if (ret != ESP_OK) 
+        {
+            printf("Error (%s) writing data to NVS!\n", esp_err_to_name(ret));
+        } 
+        else 
+        {
+            printf("Mag calibration written to NVS!\n");
+            nvs_commit(nvm_handle);
+        }
+
+        nvs_close(nvm_handle);
+    }
+}
+
+
+void read_mag_cal(float *mg_cal)
+{
+    nvs_handle_t nvm_handle;
+    esp_err_t ret = nvs_open("storage", NVS_READWRITE, &nvm_handle);
+    if (ret != ESP_OK) 
+    {
+        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+    }
+    else
+    {
+        size_t required_size;
+        ret = nvs_get_blob(nvm_handle, "mag_calib_data", NULL, &required_size);
+        if (ret == ESP_OK && required_size == 48) 
+        {
+            ret = nvs_get_blob(nvm_handle, "mag_calib_data", mg_cal, &required_size);
+            if (ret != ESP_OK) 
+            {
+                printf("Error (%s) reading data from NVS!\n", esp_err_to_name(ret));
+            } 
+        } 
+        else 
+        {
+            printf("Error (%s) reading data size from NVS!\n", esp_err_to_name(ret));
+        }
+
+        nvs_close(nvm_handle);
+    }
+}
+
+
+
+
+
+void save_acc_cal(float *acc_cal)
+{
+    nvs_handle_t nvm_handle;
+    esp_err_t ret = nvs_open("storage", NVS_READWRITE, &nvm_handle);
+    if (ret != ESP_OK) 
+    {
+        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+    } 
+    else 
+    {
+        ret = nvs_set_blob(nvm_handle, "acc_calib_data", acc_cal, 8);
+        if (ret != ESP_OK) 
+        {
+            printf("Error (%s) writing data to NVS!\n", esp_err_to_name(ret));
+        } 
+        else 
+        {
+            printf("Acc calibration written to NVS!\n");
+            nvs_commit(nvm_handle);
+        }
+
+        nvs_close(nvm_handle);
+    }
+}
+
+
+void read_acc_cal(float *acc_cal)
+{
+    nvs_handle_t nvm_handle;
+    esp_err_t ret = nvs_open("storage", NVS_READWRITE, &nvm_handle);
+    if (ret != ESP_OK) 
+    {
+        printf("Error (%s) opening NVS handle!\n", esp_err_to_name(ret));
+    }
+    else
+    {
+        size_t required_size;
+        ret = nvs_get_blob(nvm_handle, "acc_calib_data", NULL, &required_size);
+        if (ret == ESP_OK && required_size == 8) 
+        {
+            ret = nvs_get_blob(nvm_handle, "acc_calib_data", acc_cal, &required_size);
+            if (ret != ESP_OK) 
+            {
+                printf("Error (%s) reading data from NVS!\n", esp_err_to_name(ret));
+            } 
+        } 
+        else 
+        {
+            printf("Error (%s) reading data size from NVS!\n", esp_err_to_name(ret));
+        }
+
+        nvs_close(nvm_handle);
+    }
+}

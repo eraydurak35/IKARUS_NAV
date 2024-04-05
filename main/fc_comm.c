@@ -10,7 +10,6 @@ spi_slave_transaction_t trans;
 static uint8_t *spi_heap_mem_receive = NULL;
 static uint8_t *spi_heap_mem_send = NULL;
 static nav_data_t nav_data;
-static flight_data_t flight_data;
 static const uint8_t spi_trans_byte_size = sizeof(nav_data_t) + 4;
 
 static states_t *state_ptr = NULL;
@@ -22,10 +21,13 @@ static flight_t *flight_ptr = NULL;
 static nav_config_t *config_ptr = NULL; 
 static range_finder_t *range_ptr = NULL;
 
-static void checksum_generate(uint8_t *data, uint8_t dataLenght, uint8_t *cs1, uint8_t *cs2);
-static uint8_t checksum_verify(uint8_t *data, uint8_t dataLenght);
+static float *mag_calib_ptr = NULL;
+static float *acc_calib_ptr = NULL;
 
-void flight_comm_init(states_t *sts, bmp390_t *bmp, pmw3901_t *pmw, lsm6dsl_t *lsm, hmc5883l_t *hmc, flight_t *flt, nav_config_t *cfg, range_finder_t *rng)
+static void checksum_generate(uint8_t *data, uint8_t size, uint8_t *cs1, uint8_t *cs2);
+static uint8_t checksum_verify(uint8_t *data, uint8_t size);
+
+void flight_comm_init(states_t *sts, bmp390_t *bmp, pmw3901_t *pmw, lsm6dsl_t *lsm, hmc5883l_t *hmc, flight_t *flt, nav_config_t *cfg, range_finder_t *rng, float *mg_cal, float *acc_cal)
 {
     state_ptr = sts;
     baro_ptr = bmp;
@@ -35,6 +37,8 @@ void flight_comm_init(states_t *sts, bmp390_t *bmp, pmw3901_t *pmw, lsm6dsl_t *l
     flight_ptr = flt;
     config_ptr = cfg;
     range_ptr = rng;
+    mag_calib_ptr = mg_cal;
+    acc_calib_ptr = acc_cal;
 
     spi_slave_interface_config_t slave_config =
         {
@@ -93,13 +97,12 @@ void slave_send_recv_flight_comm()
     nav_data.acc_y_ms2 = imu_ptr->accel_ms2[Y] * 400.0f;
     nav_data.acc_z_ms2 = imu_ptr->accel_ms2[Z] * 400.0f;
 
-    nav_data.mag_x_gauss = mag_ptr->axis[X] * 10.0f;
-    nav_data.mag_y_gauss = mag_ptr->axis[Y] * 10.0f;
-    nav_data.mag_z_gauss = mag_ptr->axis[Z] * 10.0f;
-
+    nav_data.mag_x_gauss = mag_ptr->axis[X];
+    nav_data.mag_y_gauss = mag_ptr->axis[Y];
+    nav_data.mag_z_gauss = mag_ptr->axis[Z];
 
     memcpy(spi_heap_mem_send + 1, &nav_data, sizeof(nav_data_t));
-    spi_heap_mem_send[0] = HEADER;
+    spi_heap_mem_send[0] = SEND_HEADER;
     static uint8_t checksum_a, checksum_b;
     checksum_generate(spi_heap_mem_send + 1, spi_trans_byte_size - 4, &checksum_a, &checksum_b);
     spi_heap_mem_send[spi_trans_byte_size - 3] = checksum_a;
@@ -113,60 +116,72 @@ void slave_send_recv_flight_comm()
     
     spi_slave_transmit(SPI2_HOST, &trans, portMAX_DELAY);
 
-    if (spi_heap_mem_receive[0] == HEADER && spi_heap_mem_receive[spi_trans_byte_size - 1] == FOOTER && checksum_verify(spi_heap_mem_receive, spi_trans_byte_size))
+
+    if (spi_heap_mem_receive[0] == RECV_HEADER_1)
     {
-        memcpy(&flight_data, spi_heap_mem_receive + 1, sizeof(flight_data_t));
-        
-        if (flight_ptr->arm_status == 0 && flight_data.arm_status == 1)
+        if (checksum_verify(spi_heap_mem_receive, 3 + 4))
         {
-            baro_ptr->gnd_press = baro_ptr->press;
-            baro_ptr->init_temp = baro_ptr->temp;
-            state_ptr->vel_forward_ms = 0;
-            state_ptr->vel_right_ms = 0;
-            state_ptr->vel_up_ms = 0;
+            range_ptr->range_cm = spi_heap_mem_receive[1] << 8 | spi_heap_mem_receive[2];
+            if (spi_heap_mem_receive[3] == 1 && flight_ptr->arm_status == 0)
+            {
+                baro_ptr->gnd_press = baro_ptr->press;
+                baro_ptr->init_temp = baro_ptr->temp;
+                state_ptr->vel_forward_ms = 0;
+                state_ptr->vel_right_ms = 0;
+                state_ptr->vel_up_ms = 0;
+            }
+            flight_ptr->arm_status = spi_heap_mem_receive[3];
         }
-        flight_ptr->arm_status = flight_data.arm_status;
-        range_ptr->range_cm = flight_data.range_cm;
-
-        if (flight_data.is_new_config)
+    }
+    else if (spi_heap_mem_receive[0] == RECV_HEADER_2)
+    {
+        if (checksum_verify(spi_heap_mem_receive, sizeof(nav_config_t) + 4))
         {
-            config_ptr->ahrs_filter_beta = flight_data.ahrs_filter_beta;
-            config_ptr->ahrs_filter_zeta = flight_data.ahrs_filter_zeta;
-            config_ptr->alt_filter_beta = flight_data.alt_filter_beta;
-            config_ptr->mag_declination_deg = flight_data.mag_declination_deg;
-            config_ptr->notch_1_bandwidth = flight_data.notch_1_bandwidth;
-            config_ptr->notch_1_freq = flight_data.notch_1_freq;
-            config_ptr->notch_2_bandwidth = flight_data.notch_2_bandwidth;
-            config_ptr->notch_2_freq = flight_data.notch_2_freq;
-            config_ptr->velxy_filter_beta = flight_data.velxy_filter_beta;
-            config_ptr->velz_filter_beta = flight_data.velz_filter_beta;
-            config_ptr->velz_filter_zeta = flight_data.velz_filter_zeta;
-
+            memcpy(config_ptr, spi_heap_mem_receive + 1, sizeof(nav_config_t));
             save_config(config_ptr);
         }
     }
+    else if (spi_heap_mem_receive[0] == RECV_HEADER_3)
+    {
+        if (checksum_verify(spi_heap_mem_receive, 48 + 4))
+        {
+            memcpy(mag_calib_ptr, spi_heap_mem_receive + 1, 48);
+            save_mag_cal(mag_calib_ptr);
+        }
+    }
+    else if (spi_heap_mem_receive[0] == RECV_HEADER_4)
+    {
+        if (checksum_verify(spi_heap_mem_receive, 8 + 4))
+        {
+            float ac_cal[2];
+            memcpy(ac_cal, spi_heap_mem_receive + 1, 8);
+            // add new bias correction to previous (because calibration made with old bias correction)
+            *acc_calib_ptr += ac_cal[0];
+            *(acc_calib_ptr + 1) += ac_cal[1];
+            save_acc_cal(acc_calib_ptr);
+        }
+    }
+
 }
 
-static void checksum_generate(uint8_t *data, uint8_t dataLenght, uint8_t *cs1, uint8_t *cs2)
+static void checksum_generate(uint8_t *data, uint8_t size, uint8_t *cs1, uint8_t *cs2)
 {
     uint8_t checksum1 = 0, checksum2 = 0;
-
-    for (uint8_t i = 0; i < dataLenght - 2; i++)
+    for (uint8_t i = 0; i < size; i++)
     {
         checksum1 = checksum1 + data[i];
         checksum2 = checksum2 + checksum1;
     }
-
     *cs1 = checksum1;
     *cs2 = checksum2;
 }
 
-static uint8_t checksum_verify(uint8_t *data, uint8_t dataLenght)
+static uint8_t checksum_verify(uint8_t *data, uint8_t size)
 {
     uint8_t c1, c2;
-    checksum_generate(data + 1, dataLenght - 4, &c1, &c2);
-    if (c1 == data[dataLenght - 3] && c2 == data[dataLenght - 2])
+    checksum_generate(data + 1, size - 4, &c1, &c2);
+    if (c1 == data[size - 3] && c2 == data[size - 2])
         return 1;
-    else
-        return 0;
+    return 0;
 }
+

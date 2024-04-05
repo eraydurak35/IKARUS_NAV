@@ -43,18 +43,23 @@ static TaskHandle_t task2_handler;
 static TaskHandle_t task3_handler;
 static TaskHandle_t task4_handler;
 static TaskHandle_t task5_handler;
-static lsm6dsl_t imu, unfilt_imu;
+static lsm6dsl_t imu;
+static lsm6dsl_t unfilt_imu;
+static lsm6dsl_t fir_filt_imu;
 static fir_filter_t fir[6];
 static notch_filter_t notch[18];
 static fft_t fft[6];
 static states_t state;
 static nav_config_t config;
 static hmc5883l_t mag;
+static hmc5883l_t uncalib_mag;
 static bmp390_t baro;
 static pmw3901_t flow;
 static flight_t flight;
 static range_finder_t range_finder = {-1};
-                                                            ///  MAG DATA NOT CALIBRATED 
+static float mag_calib_data[12] = {0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+static float acc_runtime_bias[2] = {0.0f, 0.0f};
+
 void IRAM_ATTR timer1_callback(void *arg)
 {
     xTaskNotifyFromISR(task1_handler, 1, eIncrement, false);
@@ -74,7 +79,7 @@ void task_1(void *pvParameters)
     noise_analize_init(fft);
 
     i2c_master_init(I2C_NUM_0, GPIO_NUM_21, GPIO_NUM_22, 1000000, GPIO_PULLUP_DISABLE);
-    lsm6dsl_setup(ODR_3300_HZ, ACCEL_8G, GYRO_1000DPS);
+    lsm6dsl_setup(ODR_3300_HZ, ACCEL_8G, GYRO_1000DPS, acc_runtime_bias);
 
     for (uint8_t i = 0; i < 200; i++)
     {
@@ -86,39 +91,40 @@ void task_1(void *pvParameters)
     vTaskDelay(1000 / portTICK_PERIOD_MS);
     estimator_init(&config, &state, &imu, &mag, &baro, &flow, &range_finder);
 
-    while (1)                                           // 1000 Hz
+    while (1) // 1000 Hz
     {
         if (xTaskNotifyWait(0, ULONG_MAX, &notification, 1 / portTICK_PERIOD_MS) == pdTRUE)
         {
             lsmldsl_read(&imu);
-            apply_fir_filter_to_imu(&imu, fir);
             unfilt_imu = imu;
+            apply_fir_filter_to_imu(&imu, fir);
+            fir_filt_imu = imu;
             apply_notch_filter_to_imu(&imu, notch);
             ahrs_predict();
 
             counter1++;
-            if (counter1 >= 2)                          // 500 Hz
+            if (counter1 >= 2) // 500 Hz
             {
                 counter1 = 0;
-                sample_imu_to_analize(&unfilt_imu, fft);
+                sample_imu_to_analize(&fir_filt_imu, fft);
                 ahrs_correct();
                 get_earth_frame_accel();
                 predict_velocityXY();
                 calculate_altitude_velocity();
             }
-            else                                        // 500 Hz
+            else // 500 Hz
             {
                 counter2++;
-                if (counter2 >= 5)                      // 100 Hz
+                if (counter2 >= 5) // 100 Hz
                 {
                     counter2 = 0;
                     get_flow_velocity();
                     correct_velocityXY();
                 }
-                else                                    // 400 Hz
+                else // 400 Hz
                 {
                     counter3++;
-                    if (counter3 >= 16)                  // 25 Hz
+                    if (counter3 >= 16) // 25 Hz
                     {
                         counter3 = 0;
                         reconfig_all_notch_filters(notch, fft);
@@ -141,14 +147,14 @@ void task_2(void *pvParameters)
 void task_3(void *pvParameters)
 {
     i2c_master_init(I2C_NUM_1, GPIO_NUM_33, GPIO_NUM_32, 400000, GPIO_PULLUP_DISABLE);
-    hmc5883l_setup();
+    hmc5883l_setup(mag_calib_data);
     bmp390_setup_i2c();
     vTaskDelay(500 / portTICK_PERIOD_MS);
     baro_get_ground_pressure(&baro);
 
     while (1)
     {
-        hmc5883l_read(&mag);
+        hmc5883l_read(&mag, &uncalib_mag);
         bmp390_read_i2c(&baro);
         get_baro_altitude(&baro);
         vTaskDelay(20 / portTICK_PERIOD_MS);
@@ -170,7 +176,7 @@ void task_4(void *pvParameters)
 
 void task_5(void *pvParameters)
 {
-    flight_comm_init(&state, &baro, &flow, &imu, &mag, &flight, &config, &range_finder);
+    flight_comm_init(&state, &baro, &flow, &unfilt_imu, &uncalib_mag, &flight, &config, &range_finder, mag_calib_data, acc_runtime_bias);
 
     while (1)
     {
@@ -181,6 +187,8 @@ void app_main(void)
 {
     nvs_flash_init();
     read_config(&config);
+    read_mag_cal(mag_calib_data);
+    read_acc_cal(acc_runtime_bias);
 
     xTaskCreatePinnedToCore(&task_3, "task3", 1024 * 2, NULL, 1, &task3_handler, tskNO_AFFINITY);
     xTaskCreatePinnedToCore(&task_4, "task4", 1024 * 8, NULL, 1, &task4_handler, tskNO_AFFINITY);

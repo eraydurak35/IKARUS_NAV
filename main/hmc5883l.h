@@ -63,7 +63,7 @@
 
 #define X_MSB 0x03
 
-void hmc5883l_setup();
-void hmc5883l_read(hmc5883l_t *hmc);
+void hmc5883l_setup(float *mg_cal);
+void hmc5883l_read(hmc5883l_t *hmc, hmc5883l_t *uncalib_hmc);
 
 #endif

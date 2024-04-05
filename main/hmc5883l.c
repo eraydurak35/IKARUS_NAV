@@ -2,23 +2,15 @@
 #include "hmc5883l.h"
 #include "i2c.h"
 
+static float *mag_calib_data = NULL;
+
 static void parse_hmc5883l_data(hmc5883l_t *hmc, uint8_t *buffer);
 static void get_calibrated_result(hmc5883l_t *hmc);
 
-static const float mag_bias[3] = 
+void hmc5883l_setup(float *mg_cal)
 {
-    -85.902108191348520f, -361.546412857430f, 10.7892523429568f
-};
-static const float mag_cal_matrix[3][3] = 
-{
-    {1.00746221568784f,	0.00118685905733542f, 0.0150085664361451f},
-    {0.00118685905733542f,	0.966986199469244f,	-0.00414450723533993f},
-    {0.0150085664361451f,	-0.00414450723533993f,	1.02672408688273f}
-};
+    mag_calib_data = mg_cal;
 
-
-void hmc5883l_setup()
-{
     vTaskDelay(10 / portTICK_PERIOD_MS);
     i2c_write_data(I2C_NUM_1, HMC5883L_ADDR, CONFIG_REG_A, AVERAGE_8 << 5 | ODR_75HZ << 2 | MODE_NORMAL_HMC);
 
@@ -29,11 +21,12 @@ void hmc5883l_setup()
     i2c_write_data(I2C_NUM_1, HMC5883L_ADDR, MODE_REG, HS_I2C_ENABLE << 7 | MEAS_CONTINUOUS);
 }
 
-void hmc5883l_read(hmc5883l_t *hmc)
+void hmc5883l_read(hmc5883l_t *hmc, hmc5883l_t *uncalib_hmc)
 {
     static uint8_t buff[6] = {0};
     i2c_read_data(I2C_NUM_1, HMC5883L_ADDR, X_MSB, buff, 6);
     parse_hmc5883l_data(hmc, buff);
+    *uncalib_hmc = *hmc;
     get_calibrated_result(hmc);
 }
 
@@ -47,16 +40,15 @@ static void parse_hmc5883l_data(hmc5883l_t *hmc, uint8_t *buffer)
 
 static void get_calibrated_result(hmc5883l_t *hmc)
 {
-
     static float temp_x = 0;
     static float temp_y = 0;
     static float temp_z = 0; 
 
-    temp_x = hmc->axis[0] - mag_bias[0];
-    temp_y = hmc->axis[1] - mag_bias[1];
-    temp_z = hmc->axis[2] - mag_bias[2];
+    temp_x = hmc->axis[0] - mag_calib_data[0];
+    temp_y = hmc->axis[1] - mag_calib_data[1];
+    temp_z = hmc->axis[2] - mag_calib_data[2];
 
-    hmc->axis[0] = mag_cal_matrix[0][0] * temp_x + mag_cal_matrix[0][1] * temp_y + mag_cal_matrix[0][2] * temp_z;
-    hmc->axis[1] = mag_cal_matrix[1][0] * temp_x + mag_cal_matrix[1][1] * temp_y + mag_cal_matrix[1][2] * temp_z;
-    hmc->axis[2] = mag_cal_matrix[2][0] * temp_x + mag_cal_matrix[2][1] * temp_y + mag_cal_matrix[2][2] * temp_z;
+    hmc->axis[0] = mag_calib_data[3] * temp_x + mag_calib_data[4] * temp_y + mag_calib_data[5] * temp_z;
+    hmc->axis[1] = mag_calib_data[6] * temp_x + mag_calib_data[7] * temp_y + mag_calib_data[8] * temp_z;
+    hmc->axis[2] = mag_calib_data[9] * temp_x + mag_calib_data[10] * temp_y + mag_calib_data[11] * temp_z;
 }

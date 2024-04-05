@@ -27,7 +27,12 @@ static float acc_forward_bias = 0.0f;
 static float acc_right_bias = 0.0f;
 static float acc_up_bias = 0.0f;
 
+static float rotation_matrix[3][3];
+
+static float flow_accel_correct[3];
+
 static void get_attitude_heading();
+static void get_rotation_matrix();
 
 void estimator_init(nav_config_t *cfg, states_t *sta, lsm6dsl_t *lsm, hmc5883l_t *hmc, bmp390_t *baro, pmw3901_t *flw, range_finder_t *rng)
 {
@@ -113,10 +118,52 @@ void ahrs_correct()
     static vector_t err_mag = {0.0f, 0.0f, 0.0f};
     static vector_t temp = {0.0f, 0.0f, 0.0f};
 
-    acc_vec.x = imu_ptr->accel_ms2[Y];
-    acc_vec.y = imu_ptr->accel_ms2[X];
-    acc_vec.z = -imu_ptr->accel_ms2[Z];
+/*     static int32_t c = 0;
 
+
+    c++;
+    if (c < 5000)
+    {
+        acc_vec.x = imu_ptr->accel_ms2[Y];
+        acc_vec.y = imu_ptr->accel_ms2[X];
+        acc_vec.z = -imu_ptr->accel_ms2[Z];
+    }
+    else if (c == 5000)
+    {
+        printf("100\n");
+        acc_vec.x = imu_ptr->accel_ms2[Y];
+        acc_vec.y = imu_ptr->accel_ms2[X];
+        acc_vec.z = -imu_ptr->accel_ms2[Z];
+    }
+    else if (c < 17000)
+    {
+        acc_vec.x = imu_ptr->accel_ms2[Y] + 0.635f;
+        acc_vec.y = imu_ptr->accel_ms2[X];
+        acc_vec.z = -imu_ptr->accel_ms2[Z];
+    }
+    else if (c == 17000)
+    {
+        printf("-100\n");
+        acc_vec.x = imu_ptr->accel_ms2[Y];
+        acc_vec.y = imu_ptr->accel_ms2[X];
+        acc_vec.z = -imu_ptr->accel_ms2[Z];
+    }
+    else if (c > 17000)
+    {
+        acc_vec.x = imu_ptr->accel_ms2[Y];
+        acc_vec.y = imu_ptr->accel_ms2[X];
+        acc_vec.z = -imu_ptr->accel_ms2[Z]; 
+    }
+ */
+
+    //printf("%.2f,",imu_ptr->accel_ms2[Z]);
+/*     acc_vec.x = imu_ptr->accel_ms2[Y];
+    acc_vec.y = imu_ptr->accel_ms2[X];
+    acc_vec.z = -(imu_ptr->accel_ms2[Z]); */
+    acc_vec.x = imu_ptr->accel_ms2[Y] - flow_accel_correct[1];
+    acc_vec.y = imu_ptr->accel_ms2[X] - flow_accel_correct[0];
+    acc_vec.z = -(imu_ptr->accel_ms2[Z] - flow_accel_correct[2]);
+    //printf("%.2f\n",-acc_vec.z);
     mag_vec.x = mag_ptr->axis[Y];
     mag_vec.y = -mag_ptr->axis[X];
     mag_vec.z = -mag_ptr->axis[Z];
@@ -154,12 +201,16 @@ void ahrs_correct()
     imu_ptr->gyro_bias_dps[X] += err.y * config_ptr->ahrs_filter_zeta;
     imu_ptr->gyro_bias_dps[Z] -= err.z * config_ptr->ahrs_filter_zeta;
 
+    
+
     get_attitude_heading();
+
+    //printf("%.2f\n", state_ptr->pitch_deg);
 }
 
 void get_earth_frame_accel()
 {
-    static float rot_matrix[3][3] = {0};
+/*     static float rot_matrix[3][3] = {0};
     static float pitch_radians = 0.0f;
     static float roll_radians = 0.0f;
     static float cosx = 0.0f;
@@ -183,11 +234,13 @@ void get_earth_frame_accel()
     rot_matrix[1][2] = -sinx * cosy;
     rot_matrix[2][0] = -(cosx * siny);
     rot_matrix[2][1] = sinx;
-    rot_matrix[2][2] = cosy * cosx;
+    rot_matrix[2][2] = cosy * cosx; */
 
-    state_ptr->acc_forward_ms2 = imu_ptr->accel_ms2[Y] * rot_matrix[0][0] + imu_ptr->accel_ms2[X] * rot_matrix[1][0] + imu_ptr->accel_ms2[Z] * rot_matrix[2][0];
-    state_ptr->acc_right_ms2 = imu_ptr->accel_ms2[Y] * rot_matrix[0][1] + imu_ptr->accel_ms2[X] * rot_matrix[1][1] + imu_ptr->accel_ms2[Z] * rot_matrix[2][1];
-    state_ptr->acc_up_ms2 = (imu_ptr->accel_ms2[Y] * rot_matrix[0][2] + imu_ptr->accel_ms2[X] * rot_matrix[1][2] + imu_ptr->accel_ms2[Z] * rot_matrix[2][2]) - 9.806f;
+    get_rotation_matrix();
+
+    state_ptr->acc_forward_ms2 = imu_ptr->accel_ms2[Y] * rotation_matrix[0][0] + imu_ptr->accel_ms2[X] * rotation_matrix[1][0] + imu_ptr->accel_ms2[Z] * rotation_matrix[2][0];
+    state_ptr->acc_right_ms2 = imu_ptr->accel_ms2[Y] * rotation_matrix[0][1] + imu_ptr->accel_ms2[X] * rotation_matrix[1][1] + imu_ptr->accel_ms2[Z] * rotation_matrix[2][1];
+    state_ptr->acc_up_ms2 = (imu_ptr->accel_ms2[Y] * rotation_matrix[0][2] + imu_ptr->accel_ms2[X] * rotation_matrix[1][2] + imu_ptr->accel_ms2[Z] * rotation_matrix[2][2]) - 9.806f;
 }
 
 void correct_velocityXY()
@@ -195,15 +248,15 @@ void correct_velocityXY()
     float diff_x = flow_ptr->velocity_x_ms - state_ptr->vel_forward_ms;
     float diff_y = flow_ptr->velocity_y_ms - state_ptr->vel_right_ms;
 
-    if (diff_x < -0.3f)
-        diff_x = -0.3f;
-    else if (diff_x > 0.3f)
-        diff_x = 0.3f;
+    if (diff_x < -1.5f)
+        diff_x = -1.5f;
+    else if (diff_x > 1.5f)
+        diff_x = 1.5f;
 
-    if (diff_y < -0.3f)
-        diff_y = -0.3f;
-    else if (diff_y > 0.3f)
-        diff_y = 0.3f;
+    if (diff_y < -1.5f)
+        diff_y = -1.5f;
+    else if (diff_y > 1.5f)
+        diff_y = 1.5f;
 
     acc_forward_bias -= diff_x * 0.001f;
     acc_right_bias -= diff_y * 0.001f;
@@ -211,11 +264,40 @@ void correct_velocityXY()
     state_ptr->vel_forward_ms += diff_x * (1.0f - config_ptr->velxy_filter_beta);
     state_ptr->vel_right_ms += diff_y * (1.0f - config_ptr->velxy_filter_beta);
 }
-void predict_velocityXY()
+void predict_velocityXY() // 500Hz
 {
     static const float dt = 0.002f;
+    static float flow_accel_forward_ms = 0;
+    static float flow_accel_right_ms = 0;
+    static float filt_flow_accel_forward_ms = 0;
+    static float filt_flow_accel_right_ms = 0;
+    static float prev_vel_forward_ms = 0;
+    static float prev_vel_right_ms = 0;
+
     state_ptr->vel_forward_ms += (state_ptr->acc_forward_ms2 - acc_forward_bias) * dt;
     state_ptr->vel_right_ms += (state_ptr->acc_right_ms2 - acc_right_bias) * dt;
+
+    state_ptr->vel_forward_ms -= state_ptr->vel_right_ms * sinf(-state_ptr->yaw_dps * DEG_TO_RAD * 0.002f);
+    state_ptr->vel_right_ms += state_ptr->vel_forward_ms * sinf(-state_ptr->yaw_dps * DEG_TO_RAD * 0.002f);
+
+
+    ///////////////////////////
+    flow_accel_forward_ms = (state_ptr->vel_forward_ms - prev_vel_forward_ms) / dt;
+    flow_accel_right_ms = (state_ptr->vel_right_ms - prev_vel_right_ms) / dt;
+
+    filt_flow_accel_forward_ms += (flow_accel_forward_ms - filt_flow_accel_forward_ms) * 0.15f;
+    filt_flow_accel_right_ms += (flow_accel_right_ms - filt_flow_accel_right_ms) * 0.15f;
+
+    prev_vel_forward_ms = state_ptr->vel_forward_ms;
+    prev_vel_right_ms = state_ptr->vel_right_ms;
+
+    //printf("%.2f,%.2f\n", flow_accel_right_ms, filt_flow_accel_right_ms);
+
+    get_rotation_matrix();
+
+    flow_accel_correct[1] = filt_flow_accel_forward_ms * rotation_matrix[0][0] + filt_flow_accel_right_ms * rotation_matrix[0][1] + 0 * rotation_matrix[0][2];
+    flow_accel_correct[0] = filt_flow_accel_forward_ms * rotation_matrix[1][0] + filt_flow_accel_right_ms * rotation_matrix[1][1] + 0 * rotation_matrix[1][2];
+    flow_accel_correct[2] = filt_flow_accel_forward_ms * rotation_matrix[2][0] + filt_flow_accel_right_ms * rotation_matrix[2][1] + 0 * rotation_matrix[2][2];
 }
 
 void get_flow_velocity()
@@ -247,7 +329,7 @@ void get_flow_velocity()
 
     // 4cm away from center of rotation correction via angular speed to linear speed calculation
     // y axis is not needed
-    flow_ptr->velocity_x_ms -= (state_ptr->yaw_dps * DEG_TO_RAD) * 0.04f;
+    flow_ptr->velocity_x_ms -= (state_ptr->yaw_dps * DEG_TO_RAD) * 0.045f;
 }
 
 void calculate_altitude_velocity()
@@ -264,13 +346,17 @@ void calculate_altitude_velocity()
     float baroVel;
     static const float dt = 0.002f;
 
-    BaroAlt = baro_ptr->altitude_m;
+    //BaroAlt = baro_ptr->altitude_m;
+    BaroAlt += (baro_ptr->altitude_m - BaroAlt) * 0.1f;
+
     if (range_finder->range_cm > 400)
         RangeAlt = -1.0; // 400
 
     else
-        RangeAlt = range_finder->range_cm / 100.0f;
-        //RangeAlt = -1;
+        RangeAlt += ((range_finder->range_cm / 100.0f) - RangeAlt) * 0.1f; //RangeAlt = range_finder->range_cm / 100.0f;
+    
+    //printf("%.2f\n", RangeAlt);
+    //RangeAlt = -1;
 
     if (RangeAlt >= 0 && RangeAlt < 3.0f) // 3
     {
@@ -309,14 +395,45 @@ void calculate_altitude_velocity()
     baroVel = (BaroAlt - lastBaroAlt) / dt;
     lastBaroAlt = BaroAlt;
 
+    /* printf("%.2f\n", baroVel); */
+
     float velDiff;
     velDiff = baroVel - vel;
-    if (velDiff > 5.0f)
+/*     if (velDiff > 5.0f)
         velDiff = 5.0f;
     else if (velDiff < -5.0f)
-        velDiff = -5.0f;
+        velDiff = -5.0f; */
     vel += velDiff * config_ptr->velz_filter_beta * dt;
     acc_up_bias -= velDiff * config_ptr->velz_filter_zeta * dt * dt;
 
     state_ptr->vel_up_ms = vel;
+}
+
+
+static void get_rotation_matrix()
+{
+    static float pitch_radians = 0.0f;
+    static float roll_radians = 0.0f;
+    static float cosx = 0.0f;
+    static float sinx = 0.0f;
+    static float cosy = 0.0f;
+    static float siny = 0.0;
+
+    pitch_radians = state_ptr->pitch_deg * DEG_TO_RAD;
+    roll_radians = state_ptr->roll_deg * DEG_TO_RAD;
+
+    cosx = cosf(roll_radians);
+    sinx = sinf(roll_radians);
+    cosy = cosf(pitch_radians);
+    siny = sinf(pitch_radians);
+
+    rotation_matrix[0][0] = cosy;
+    rotation_matrix[0][1] = 0.0f;
+    rotation_matrix[0][2] = siny;
+    rotation_matrix[1][0] = sinx * siny;
+    rotation_matrix[1][1] = cosx;
+    rotation_matrix[1][2] = -sinx * cosy;
+    rotation_matrix[2][0] = -(cosx * siny);
+    rotation_matrix[2][1] = sinx;
+    rotation_matrix[2][2] = cosy * cosx;
 }
