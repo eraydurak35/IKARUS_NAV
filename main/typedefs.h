@@ -24,7 +24,7 @@ typedef struct
     float x2;
     float y1;
     float y2;
-} lowpass_filter_t;
+} biquad_lpf_t;
 
 typedef struct
 {
@@ -97,10 +97,8 @@ typedef struct
 typedef struct
 {
   uint8_t arm_status;
-  uint8_t alt_hold_status;
-  uint8_t pos_hold_status;
-  uint8_t takeoff_status;
-  uint8_t waypoint_mission_status;
+  uint8_t is_in_flight_mag_allign_done;
+  uint16_t throttle;
 } flight_t;
 
 typedef struct
@@ -148,7 +146,7 @@ typedef struct
 typedef struct
 {
     float axis[3];
-} hmc5883l_t;
+} magnetometer_t;
 
 
 typedef struct

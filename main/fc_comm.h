@@ -16,7 +16,7 @@
 #define FOOTER 0x31
 #define SEND_HEADER 0x69
 
-void flight_comm_init(states_t *sts, bmp390_t *bmp, pmw3901_t *pmw, lsm6dsl_t *lsm, hmc5883l_t *hmc, flight_t *flt, nav_config_t *cfg, range_finder_t *rng, float *mg_cal, float *acc_cal);
+void flight_comm_init(states_t *sts, bmp390_t *bmp, pmw3901_t *pmw, lsm6dsl_t *lsm, magnetometer_t *mag, flight_t *flt, nav_config_t *cfg, range_finder_t *rng, float *mg_cal, float *acc_cal);
 void slave_send_recv_flight_comm();
 
 #endif

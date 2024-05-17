@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include "typedefs.h"
 
+#define LPF_CUTOFF_FREQ 50.0f
+
 void fir_filter_init(fir_filter_t *fir);
 void fir_filter(fir_filter_t *fir, float *value);
 void fir_filter_custom_gain(fir_filter_t *fir, const float *gain, float *value);
@@ -16,6 +18,8 @@ void apply_notch_filter_to_imu(lsm6dsl_t *imu, notch_filter_t *notch);
 void reconfig_all_notch_filters(notch_filter_t *notch, fft_t *fft);
 
 
-void lowpass_configure(float cf, lowpass_filter_t *lowpass);
-void lowpass_filter(lowpass_filter_t *lowpass, float *value);
+void biquad_lpf_configure(float cf, biquad_lpf_t *lowpass);
+void biquad_lpf(biquad_lpf_t *lowpass, float *value);
+void biquad_lpf_array_init(biquad_lpf_t *lpf);
+void apply_biquad_lpf_to_imu(lsm6dsl_t *imu, biquad_lpf_t *lpf);
 #endif

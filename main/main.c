@@ -26,7 +26,7 @@
 #include "noise_analize.h"
 #include "nv_storage.h"
 #include "typedefs.h"
-#include "hmc5883l.h"
+#include "qmc5883l.h"
 #include "lsm6dsl.h"
 #include "pmw3901.h"
 #include "filters.h"
@@ -45,14 +45,14 @@ static TaskHandle_t task4_handler;
 static TaskHandle_t task5_handler;
 static lsm6dsl_t imu;
 static lsm6dsl_t unfilt_imu;
-static lsm6dsl_t fir_filt_imu;
-static fir_filter_t fir[6];
+static lsm6dsl_t lpf_imu;
+static biquad_lpf_t lpf[6];
 static notch_filter_t notch[18];
 static fft_t fft[6];
 static states_t state;
 static nav_config_t config;
-static hmc5883l_t mag;
-static hmc5883l_t uncalib_mag;
+static magnetometer_t mag;
+static magnetometer_t uncalib_mag;
 static bmp390_t baro;
 static pmw3901_t flow;
 static flight_t flight;
@@ -74,22 +74,22 @@ void task_1(void *pvParameters)
     imu.gyro_bias_dps[X] = 2.1f;
     imu.gyro_bias_dps[Y] = -3.05f;
     imu.gyro_bias_dps[Z] = -1.1f;
-    fir_filter_init(fir);
+    biquad_lpf_array_init(lpf);
     notch_filter_init(notch);
     noise_analize_init(fft);
 
     i2c_master_init(I2C_NUM_0, GPIO_NUM_21, GPIO_NUM_22, 1000000, GPIO_PULLUP_DISABLE);
-    lsm6dsl_setup(ODR_3300_HZ, ACCEL_8G, GYRO_1000DPS, acc_runtime_bias);
+    lsm6dsl_setup(acc_runtime_bias);
 
     for (uint8_t i = 0; i < 200; i++)
     {
         lsmldsl_read(&imu);
-        apply_fir_filter_to_imu(&imu, fir);
+        apply_biquad_lpf_to_imu(&imu, lpf);
         apply_notch_filter_to_imu(&imu, notch);
         vTaskDelay(3 / portTICK_PERIOD_MS);
     }
     vTaskDelay(1000 / portTICK_PERIOD_MS);
-    estimator_init(&config, &state, &imu, &mag, &baro, &flow, &range_finder);
+    estimator_init(&config, &state, &imu, &mag, &baro, &flow, &range_finder, &flight);
 
     while (1) // 1000 Hz
     {
@@ -97,20 +97,20 @@ void task_1(void *pvParameters)
         {
             lsmldsl_read(&imu);
             unfilt_imu = imu;
-            apply_fir_filter_to_imu(&imu, fir);
-            fir_filt_imu = imu;
+            apply_biquad_lpf_to_imu(&imu, lpf);
+            lpf_imu = imu;
             apply_notch_filter_to_imu(&imu, notch);
             ahrs_predict();
+            ahrs_correct();
+            get_earth_frame_accel();
+            predict_velocityXY();
+            estimate_altitude_velocity();
 
             counter1++;
             if (counter1 >= 2) // 500 Hz
             {
                 counter1 = 0;
-                sample_imu_to_analize(&fir_filt_imu, fft);
-                ahrs_correct();
-                get_earth_frame_accel();
-                predict_velocityXY();
-                calculate_altitude_velocity();
+                sample_imu_to_analize(&lpf_imu, fft);
             }
             else // 500 Hz
             {
@@ -147,17 +147,17 @@ void task_2(void *pvParameters)
 void task_3(void *pvParameters)
 {
     i2c_master_init(I2C_NUM_1, GPIO_NUM_33, GPIO_NUM_32, 400000, GPIO_PULLUP_DISABLE);
-    hmc5883l_setup(mag_calib_data);
+    qmc5883l_setup(mag_calib_data);
     bmp390_setup_i2c();
     vTaskDelay(500 / portTICK_PERIOD_MS);
     baro_get_ground_pressure(&baro);
 
     while (1)
     {
-        hmc5883l_read(&mag, &uncalib_mag);
+        qmc5883l_read(&mag, &uncalib_mag, flight.throttle);
         bmp390_read_i2c(&baro);
         get_baro_altitude(&baro);
-        vTaskDelay(20 / portTICK_PERIOD_MS);
+        vTaskDelay(19 / portTICK_PERIOD_MS);
     }
 }
 

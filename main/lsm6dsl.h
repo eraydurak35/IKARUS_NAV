@@ -22,30 +22,30 @@
 #define TEMP_SENSITIVITY_MC 2.56f
 
 
-#define ODR_12_5_HZ 1
-#define ODR_26_HZ 2
-#define ODR_52_HZ 3
-#define ODR_104_HZ 4
-#define ODR_208_HZ 5
-#define ODR_416_HZ 6
-#define ODR_833_HZ 7
-#define ODR_1666_HZ 8
-#define ODR_3300_HZ 9
-#define ODR_6600_HZ 10
+#define ODR_12_5_HZ (1 << 4)
+#define ODR_26_HZ (2 << 4)
+#define ODR_52_HZ (3 << 4)
+#define ODR_104_HZ (4 << 4)
+#define ODR_208_HZ (5 << 4)
+#define ODR_416_HZ (6 << 4)
+#define ODR_833_HZ (7 << 4)
+#define ODR_1666_HZ (8 << 4)
+#define ODR_3300_HZ (9 << 4)
+#define ODR_6600_HZ (10 << 4)
 
-#define ACCEL_2G 0
-#define ACCEL_4G 2
-#define ACCEL_8G 3
-#define ACCEL_16G 1
+#define ACCEL_2G (0 << 2)
+#define ACCEL_4G (2 << 2) 
+#define ACCEL_8G (3 << 2)
+#define ACCEL_16G (1 << 2)
 
-#define GYRO_250DPS 0
-#define GYRO_500DPS 1
-#define GYRO_1000DPS 2
-#define GYRO_2000DPS 3
+#define GYRO_250DPS (0 << 2)
+#define GYRO_500DPS (1 << 2)
+#define GYRO_1000DPS (2 << 2)
+#define GYRO_2000DPS (3 << 2)
 
 
 void lsmldsl_read(lsm6dsl_t *imu);
-void lsm6dsl_setup(uint8_t odr, uint8_t accel_range, uint8_t gyro_range, float *acc_cal);
+void lsm6dsl_setup(float *acc_cal);
 
 
 #endif

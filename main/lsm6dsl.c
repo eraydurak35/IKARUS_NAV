@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include "lsm6dsl.h"
 #include "i2c.h"
-
 #include "math.h"
+
+
 static float *acc_runtime_bias_ptr;
 const float accel_bias_ms2[3] = {-0.0410183726183868f, -0.0476472728044818f, 0.249395466543557f};
 const float accel_calib_matrix[3][3] = 
@@ -13,18 +14,16 @@ const float accel_calib_matrix[3][3] =
 };
 
 
-
 static void getCalibratedResults(lsm6dsl_t *imu);
 static void parse_buffer(uint8_t *buff, lsm6dsl_t *imu);
 
-
-void lsm6dsl_setup(uint8_t odr, uint8_t accel_range, uint8_t gyro_range, float *acc_cal)
+void lsm6dsl_setup(float *acc_cal)
 {
-    i2c_write_data(I2C_NUM_0, LSM6DSL_ADDR, CTRL1_XL, odr << 4 | accel_range << 2 | 3); // 0xAF
+    i2c_write_data(I2C_NUM_0, LSM6DSL_ADDR, CTRL1_XL, ODR_1666_HZ | ACCEL_8G | 3); // 0xAF
     vTaskDelay(20 / portTICK_PERIOD_MS);
     i2c_write_data(I2C_NUM_0, LSM6DSL_ADDR, CTRL8_XL, 0xE1);
     vTaskDelay(20 / portTICK_PERIOD_MS);
-    i2c_write_data(I2C_NUM_0, LSM6DSL_ADDR, CTRL2_G, odr << 4 | gyro_range << 2 | 0);// 0X98
+    i2c_write_data(I2C_NUM_0, LSM6DSL_ADDR, CTRL2_G, ODR_1666_HZ | GYRO_1000DPS | 0);// 0X98
     vTaskDelay(20 / portTICK_PERIOD_MS); 
     i2c_write_data(I2C_NUM_0, LSM6DSL_ADDR, CTRL4_C, 0x02);
     vTaskDelay(20 / portTICK_PERIOD_MS);
@@ -60,12 +59,6 @@ static void getCalibratedResults(lsm6dsl_t *imu)
     imu->gyro_dps[Y] -= imu->gyro_bias_dps[Y];
     imu->gyro_dps[Z] -= imu->gyro_bias_dps[Z];
 
-/*     float x_radian = imu->gyro_dps[X] * 0.0174532925f;
-    float y_radian = imu->gyro_dps[Y] * 0.0174532925f;
-    float centrifugal_accel = 0.065 * (x_radian * x_radian + y_radian * y_radian) * 9.806f;
-    static float filt_centrifugal_accel = 0;
-    filt_centrifugal_accel += (centrifugal_accel - filt_centrifugal_accel) * 0.001f; */
-
     static float temp_x = 0;
     static float temp_y = 0;
     static float temp_z = 0;
@@ -73,7 +66,6 @@ static void getCalibratedResults(lsm6dsl_t *imu)
     temp_x = imu->accel_ms2[X] - accel_bias_ms2[X] - acc_runtime_bias_ptr[0];
     temp_y = imu->accel_ms2[Y] - accel_bias_ms2[Y] - acc_runtime_bias_ptr[1];
     temp_z = imu->accel_ms2[Z] - accel_bias_ms2[Z];
-    //temp_z = (imu->accel_ms2[Z] - accel_bias_ms2[Z]) + filt_centrifugal_accel;
 
     imu->accel_ms2[X] = accel_calib_matrix[0][0] * temp_x + accel_calib_matrix[0][1] * temp_y + accel_calib_matrix[0][2] * temp_z;
     imu->accel_ms2[Y] = accel_calib_matrix[1][0] * temp_x + accel_calib_matrix[1][1] * temp_y + accel_calib_matrix[1][2] * temp_z;

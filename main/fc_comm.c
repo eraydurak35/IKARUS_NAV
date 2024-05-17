@@ -16,7 +16,7 @@ static states_t *state_ptr = NULL;
 static bmp390_t *baro_ptr = NULL;
 static pmw3901_t *flow_ptr = NULL;
 static lsm6dsl_t *imu_ptr = NULL;
-static hmc5883l_t *mag_ptr = NULL;
+static magnetometer_t *mag_ptr = NULL;
 static flight_t *flight_ptr = NULL;
 static nav_config_t *config_ptr = NULL; 
 static range_finder_t *range_ptr = NULL;
@@ -27,13 +27,13 @@ static float *acc_calib_ptr = NULL;
 static void checksum_generate(uint8_t *data, uint8_t size, uint8_t *cs1, uint8_t *cs2);
 static uint8_t checksum_verify(uint8_t *data, uint8_t size);
 
-void flight_comm_init(states_t *sts, bmp390_t *bmp, pmw3901_t *pmw, lsm6dsl_t *lsm, hmc5883l_t *hmc, flight_t *flt, nav_config_t *cfg, range_finder_t *rng, float *mg_cal, float *acc_cal)
+void flight_comm_init(states_t *sts, bmp390_t *bmp, pmw3901_t *pmw, lsm6dsl_t *lsm, magnetometer_t *mag, flight_t *flt, nav_config_t *cfg, range_finder_t *rng, float *mg_cal, float *acc_cal)
 {
     state_ptr = sts;
     baro_ptr = bmp;
     flow_ptr = pmw;
     imu_ptr = lsm;
-    mag_ptr = hmc;
+    mag_ptr = mag;
     flight_ptr = flt;
     config_ptr = cfg;
     range_ptr = rng;
@@ -119,9 +119,10 @@ void slave_send_recv_flight_comm()
 
     if (spi_heap_mem_receive[0] == RECV_HEADER_1)
     {
-        if (checksum_verify(spi_heap_mem_receive, 3 + 4))
+        if (checksum_verify(spi_heap_mem_receive, (3+2) + 4))
         {
             range_ptr->range_cm = spi_heap_mem_receive[1] << 8 | spi_heap_mem_receive[2];
+            // Triggers one time when armed
             if (spi_heap_mem_receive[3] == 1 && flight_ptr->arm_status == 0)
             {
                 baro_ptr->gnd_press = baro_ptr->press;
@@ -129,8 +130,24 @@ void slave_send_recv_flight_comm()
                 state_ptr->vel_forward_ms = 0;
                 state_ptr->vel_right_ms = 0;
                 state_ptr->vel_up_ms = 0;
+                flight_ptr->is_in_flight_mag_allign_done = 0;
+            }
+            // Triggers one time when disarmed
+            else if (spi_heap_mem_receive[3] == 0 && flight_ptr->arm_status == 1)
+            {
+                // velocity estimations set to zero
+                state_ptr->vel_forward_ms = 0;
+                state_ptr->vel_right_ms = 0;
+                state_ptr->vel_up_ms = 0;
             }
             flight_ptr->arm_status = spi_heap_mem_receive[3];
+
+            // This throttle value used to correct for magnetometer error (300 <= throttle <= 1000)
+            // When disarmed correction must be zero (throttle = 200 --> zero correction)
+            if (flight_ptr->arm_status == 1) flight_ptr->throttle = spi_heap_mem_receive[4] << 8 | spi_heap_mem_receive[5];
+            else flight_ptr->throttle = 200;
+
+            //printf("%d\n", flight_ptr->throttle);
         }
     }
     else if (spi_heap_mem_receive[0] == RECV_HEADER_2)

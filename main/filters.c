@@ -166,7 +166,7 @@ void apply_notch_filter_to_imu(lsm6dsl_t *imu, notch_filter_t *notch)
 }
 
 
-void lowpass_configure(float cf, lowpass_filter_t *lowpass)
+void biquad_lpf_configure(float cf, biquad_lpf_t *lowpass)
 {
     float omega = 2.0f * M_PI * cf / 1000.0f;
     float sn = sinf(omega);
@@ -187,7 +187,7 @@ void lowpass_configure(float cf, lowpass_filter_t *lowpass)
     lowpass->a2 /= lowpass->a0;
 }
 
-void lowpass_filter(lowpass_filter_t *lowpass, float *value)
+void biquad_lpf(biquad_lpf_t *lowpass, float *value)
 {
     static float x = 0;
     static float y = 0;
@@ -198,4 +198,21 @@ void lowpass_filter(lowpass_filter_t *lowpass, float *value)
     lowpass->y2 = lowpass->y1;
     lowpass->y1 = y;
     *value = y;
+}
+
+void biquad_lpf_array_init(biquad_lpf_t *lpf)
+{
+    for (uint8_t i = 0; i < 6; i++)
+    {
+        biquad_lpf_configure(LPF_CUTOFF_FREQ, lpf + i);
+    }
+}
+
+void apply_biquad_lpf_to_imu(lsm6dsl_t *imu, biquad_lpf_t *lpf)
+{
+    for (uint8_t i = 0; i < 3; i++)
+    {
+        biquad_lpf(&lpf[i], &imu->gyro_dps[i]);
+        biquad_lpf(&lpf[i+3], &imu->accel_ms2[i]);
+    }
 }

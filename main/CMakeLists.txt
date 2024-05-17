@@ -1,9 +1,9 @@
 idf_component_register(SRCS 
+"qmc5883l.c"
 "fc_comm.c"
 "quaternion.c"
 "gpio.c"
 "pmw3901.c"
-"hmc5883l.c"
 "uart.c"
 "bmp390.c"
 "i2c.c"
